@@ -203,18 +203,6 @@ LLM reasoning with Guardrails
 
 ✅ 10-minute demonstration video (YouTube link in README)
 
-yaml
-Copy code
 
 ---
 
-✅ **How to use:**
-1. Copy this content into your repo as `README.md`.  
-2. Replace `<your-username>` with your actual GitHub username.  
-3. (Optional) Add your YouTube demo link at the bottom once you upload it.
-
----
-
-Would you like me to now add a **recruiter-focused short project tagline** for your GitHub repo description (appears just under your repo title on GitHub)?  
-Example:  
-> “Agentic AI-powered DevOps Auditor that autonomously reviews codebases using LangChain, RAG, and LLMs.”

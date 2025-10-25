@@ -1,0 +1,452 @@
+"""
+Deep Code Analysis Agent - High Performance Mode
+Uses Gemini's full capabilities for comprehensive analysis
+"""
+import json
+from typing import List, Dict, Any
+from langchain_google_genai import ChatGoogleGenerativeAI
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import re
+
+class DeepCodeAnalyzer:
+    def __init__(self, api_key: str):
+        # Use Gemini 2.5 Flash with max context
+        self.llm = ChatGoogleGenerativeAI(
+            model="gemini-2.5-flash",
+            google_api_key=api_key,
+            temperature=0.1,
+            max_tokens=8192,  # Maximum output tokens
+            top_p=0.95,
+            top_k=40
+        )
+        
+        # For parallel processing
+        self.executor = ThreadPoolExecutor(max_workers=3)
+    
+    def deep_analyze(self, files: List[Dict], repo_structure: str) -> Dict[str, Any]:
+        """
+        Perform comprehensive multi-dimensional analysis
+        """
+        print("🔍 Starting deep analysis...")
+        
+        # Run multiple analysis types in parallel
+        futures = {
+            'security': self.executor.submit(self._analyze_security, files),
+            'performance': self.executor.submit(self._analyze_performance, files),
+            'architecture': self.executor.submit(self._analyze_architecture, files, repo_structure),
+            'code_quality': self.executor.submit(self._analyze_code_quality, files),
+            'documentation': self.executor.submit(self._analyze_documentation, files),
+            'dependencies': self.executor.submit(self._analyze_dependencies, files),
+            'best_practices': self.executor.submit(self._analyze_best_practices, files)
+        }
+        
+        # Collect results
+        results = {}
+        for analysis_type, future in futures.items():
+            try:
+                results[analysis_type] = future.result()
+                print(f"✅ {analysis_type.title()} analysis complete")
+            except Exception as e:
+                print(f"⚠️ {analysis_type} analysis failed: {e}")
+                results[analysis_type] = {"error": str(e), "issues": []}
+        
+        # Generate comprehensive summary
+        results['summary'] = self._generate_summary(results)
+        results['priority_fixes'] = self._prioritize_issues(results)
+        
+        return results
+    
+    def _analyze_security(self, files: List[Dict]) -> Dict:
+        """Deep security analysis"""
+        prompt = f"""You are a security expert. Perform COMPREHENSIVE security analysis on this codebase.
+
+Analyze these files for security vulnerabilities:
+{self._prepare_code_context(files, max_files=50)}
+
+Find ALL security issues including:
+1. **Hardcoded Secrets**: API keys, passwords, tokens, database credentials
+2. **Injection Vulnerabilities**: SQL injection, command injection, XSS, XXE
+3. **Authentication Issues**: Weak authentication, missing auth checks, session management
+4. **Cryptography Issues**: Weak algorithms, insecure random, broken crypto
+5. **Input Validation**: Missing validation, unsafe deserialization, path traversal
+6. **Access Control**: Missing authorization, insecure direct object references
+7. **Configuration Issues**: Debug mode in production, exposed endpoints
+8. **Dependency Vulnerabilities**: Known vulnerable packages
+9. **Information Disclosure**: Stack traces, verbose errors, comments with sensitive data
+10. **Business Logic Flaws**: Race conditions, logic bypasses
+
+For EACH issue found, provide:
+- **File and line number** (exact location)
+- **Severity**: CRITICAL/HIGH/MEDIUM/LOW
+- **Issue description**: What's wrong
+- **Attack scenario**: How it could be exploited
+- **Fix recommendation**: Exact code to fix it
+- **CWE/CVE reference** if applicable
+
+Return as JSON:
+{{
+  "critical_issues": [...],
+  "high_severity": [...],
+  "medium_severity": [...],
+  "low_severity": [...],
+  "total_issues": number
+}}
+
+Be thorough. This is for production security.
+"""
+        
+        try:
+            response = self.llm.invoke(prompt)
+            return self._parse_json_response(response.content, "security")
+        except Exception as e:
+            return {"error": str(e), "issues": []}
+    
+    def _analyze_performance(self, files: List[Dict]) -> Dict:
+        """Deep performance analysis"""
+        prompt = f"""You are a performance optimization expert. Analyze this code for performance issues.
+
+Code to analyze:
+{self._prepare_code_context(files, max_files=50)}
+
+Find ALL performance bottlenecks:
+1. **Algorithmic Complexity**: O(n²) or worse algorithms, unnecessary nested loops
+2. **Database Issues**: N+1 queries, missing indexes, full table scans, inefficient queries
+3. **Memory Leaks**: Unclosed resources, circular references, large object retention
+4. **I/O Bottlenecks**: Blocking I/O, synchronous calls, missing connection pooling
+5. **Inefficient Data Structures**: Wrong collection types, unnecessary copying
+6. **Repeated Computations**: Missing caching, redundant calculations
+7. **String Operations**: Inefficient concatenation, regex in loops
+8. **Resource Management**: Unclosed files/connections, thread pool issues
+9. **API Design**: Chatty APIs, over-fetching, under-fetching
+10. **Code Patterns**: Premature optimization, anti-patterns
+
+For each issue:
+- File and line number
+- Performance impact: SEVERE/HIGH/MODERATE/LOW
+- Current complexity (Big O)
+- Optimized approach (Big O)
+- Code example of fix
+- Expected performance gain
+
+Return as detailed JSON with metrics.
+"""
+        
+        try:
+            response = self.llm.invoke(prompt)
+            return self._parse_json_response(response.content, "performance")
+        except Exception as e:
+            return {"error": str(e), "issues": []}
+    
+    def _analyze_architecture(self, files: List[Dict], repo_structure: str) -> Dict:
+        """Architecture and design analysis"""
+        prompt = f"""You are a software architect. Analyze the architecture and design patterns.
+
+Repository structure:
+{repo_structure}
+
+Code files:
+{self._prepare_code_context(files, max_files=40)}
+
+Analyze:
+1. **Architecture Pattern**: Is it MVC, MVVM, Clean Architecture, etc.? Is it consistent?
+2. **SOLID Principles**: Violations of Single Responsibility, Open/Closed, etc.
+3. **Design Patterns**: Missing beneficial patterns, anti-patterns used
+4. **Code Organization**: Module cohesion, coupling, separation of concerns
+5. **Dependency Management**: Circular dependencies, tight coupling
+6. **Scalability**: Bottlenecks for scaling, monolith vs microservices
+7. **Maintainability**: Code duplication, magic numbers, hard to test code
+8. **API Design**: REST principles, GraphQL best practices, versioning
+9. **Error Handling**: Consistent error strategy, logging, monitoring
+10. **Testing Strategy**: Testability, missing test coverage areas
+
+Provide architectural recommendations with:
+- Current state assessment
+- Problems identified
+- Recommended refactoring
+- Migration path if needed
+- Priority level
+
+Return comprehensive JSON analysis.
+"""
+        
+        try:
+            response = self.llm.invoke(prompt)
+            return self._parse_json_response(response.content, "architecture")
+        except Exception as e:
+            return {"error": str(e), "issues": []}
+    
+    def _analyze_code_quality(self, files: List[Dict]) -> Dict:
+        """Code quality analysis"""
+        prompt = f"""You are a code quality expert. Perform deep code quality analysis.
+
+Code:
+{self._prepare_code_context(files, max_files=50)}
+
+Analyze for:
+1. **Code Smells**: Long methods, large classes, duplicated code, dead code
+2. **Complexity**: Cyclomatic complexity, cognitive complexity, nesting depth
+3. **Naming**: Inconsistent naming, unclear names, abbreviations
+4. **Comments**: Missing docs, outdated comments, commented-out code
+5. **Error Handling**: Bare excepts, ignored errors, generic exceptions
+6. **Type Safety**: Missing type hints, unsafe type conversions
+7. **Code Standards**: PEP 8 violations, linting issues, formatting
+8. **Magic Values**: Hard-coded constants, magic numbers/strings
+9. **Function Design**: Too many parameters, side effects, pure functions
+10. **Class Design**: God classes, data classes without methods
+
+For each issue:
+- Severity and impact
+- Refactoring suggestion
+- Example of improved code
+- Estimated effort to fix
+
+Return detailed JSON with quality metrics.
+"""
+        
+        try:
+            response = self.llm.invoke(prompt)
+            return self._parse_json_response(response.content, "code_quality")
+        except Exception as e:
+            return {"error": str(e), "issues": []}
+    
+    def _analyze_documentation(self, files: List[Dict]) -> Dict:
+        """Documentation analysis"""
+        prompt = f"""Analyze documentation completeness and quality.
+
+Code files:
+{self._prepare_code_context(files, max_files=50)}
+
+Check:
+1. **Missing Docstrings**: Functions, classes, modules without docs
+2. **Incomplete Docs**: Missing params, return types, exceptions
+3. **README Quality**: Installation, usage, examples, API docs
+4. **Code Comments**: Clarity, outdated comments, missing explanations
+5. **API Documentation**: Endpoints, request/response formats
+6. **Type Hints**: Missing or incomplete type annotations
+7. **Examples**: Missing usage examples, tutorials
+8. **Architecture Docs**: Missing system design, diagrams
+9. **Contributing Guide**: Setup, testing, PR process
+10. **Changelog**: Version history, breaking changes
+
+Return JSON with:
+- Files needing docs
+- Documentation coverage %
+- Priority documentation tasks
+- Auto-generatable docs
+"""
+        
+        try:
+            response = self.llm.invoke(prompt)
+            return self._parse_json_response(response.content, "documentation")
+        except Exception as e:
+            return {"error": str(e), "issues": []}
+    
+    def _analyze_dependencies(self, files: List[Dict]) -> Dict:
+        """Dependency analysis"""
+        # Extract requirements/package files
+        dep_files = [f for f in files if any(name in f['path'].lower() 
+                     for name in ['requirements', 'package.json', 'pom.xml', 'gemfile'])]
+        
+        if not dep_files:
+            return {"issues": [], "message": "No dependency files found"}
+        
+        prompt = f"""Analyze dependencies for security and maintenance issues.
+
+Dependency files:
+{self._prepare_code_context(dep_files)}
+
+Check:
+1. Outdated packages
+2. Known vulnerabilities (CVEs)
+3. Deprecated packages
+4. Unused dependencies
+5. Version pinning issues
+6. License incompatibilities
+7. Dependency conflicts
+
+Return JSON with specific upgrade recommendations.
+"""
+        
+        try:
+            response = self.llm.invoke(prompt)
+            return self._parse_json_response(response.content, "dependencies")
+        except Exception as e:
+            return {"error": str(e), "issues": []}
+    
+    def _analyze_best_practices(self, files: List[Dict]) -> Dict:
+        """Best practices analysis"""
+        prompt = f"""Check adherence to modern best practices.
+
+Code:
+{self._prepare_code_context(files, max_files=30)}
+
+Evaluate:
+1. **Modern Language Features**: Using latest Python/JS features appropriately
+2. **Async/Await**: Proper async handling, avoiding blocking operations
+3. **Resource Management**: Context managers, proper cleanup
+4. **Configuration**: Environment variables, config files, secrets management
+5. **Logging**: Proper logging levels, structured logging
+6. **Testing**: Unit tests, integration tests, test coverage
+7. **CI/CD**: Automated testing, deployment practices
+8. **Containerization**: Docker, orchestration if applicable
+9. **Monitoring**: Health checks, metrics, observability
+10. **Accessibility**: If web app, WCAG compliance
+
+Return actionable recommendations with examples.
+"""
+        
+        try:
+            response = self.llm.invoke(prompt)
+            return self._parse_json_response(response.content, "best_practices")
+        except Exception as e:
+            return {"error": str(e), "issues": []}
+    
+    def _prepare_code_context(self, files: List[Dict], max_files: int = 50) -> str:
+        """Prepare code for analysis with smart truncation"""
+        context_parts = []
+        total_chars = 0
+        max_chars = 350000  # ~87K tokens for Gemini's 1M context
+        
+        # Prioritize Python, JS, TS files
+        priority_extensions = ['.py', '.js', '.ts', '.jsx', '.tsx', '.java', '.go']
+        sorted_files = sorted(files, 
+                            key=lambda f: (0 if any(f['path'].endswith(ext) for ext in priority_extensions) else 1,
+                                         f.get('size', 0)))
+        
+        for file_info in sorted_files[:max_files]:
+            file_str = f"\n{'='*80}\nFile: {file_info['path']}\n{'='*80}\n{file_info['content']}\n"
+            
+            if total_chars + len(file_str) > max_chars:
+                # Truncate remaining files
+                file_str = f"\n{'='*80}\nFile: {file_info['path']} [TRUNCATED]\n{'='*80}\n{file_info['content'][:1000]}\n... [truncated for context limit]\n"
+            
+            context_parts.append(file_str)
+            total_chars += len(file_str)
+            
+            if total_chars >= max_chars:
+                break
+        
+        return "\n".join(context_parts)
+    
+    def _parse_json_response(self, response: str, analysis_type: str) -> Dict:
+        """Parse JSON from LLM response with fallback"""
+        try:
+            # Try to extract JSON from markdown code blocks
+            json_match = re.search(r'``````', response, re.DOTALL)
+            if json_match:
+                return json.loads(json_match.group(1))
+            
+            # Try parsing entire response
+            return json.loads(response)
+        except json.JSONDecodeError:
+            # Fallback: structure the raw response
+            return {
+                "raw_analysis": response,
+                "issues": self._extract_issues_from_text(response),
+                "parse_error": "Could not parse as JSON, returning structured text"
+            }
+    
+    def _extract_issues_from_text(self, text: str) -> List[Dict]:
+        """Extract issues from unstructured text"""
+        issues = []
+        lines = text.split('\n')
+        
+        current_issue = {}
+        for line in lines:
+            line = line.strip()
+            if line.startswith('**') or line.startswith('##'):
+                if current_issue:
+                    issues.append(current_issue)
+                current_issue = {"description": line.strip('*#').strip()}
+            elif line and current_issue:
+                current_issue['details'] = current_issue.get('details', '') + ' ' + line
+        
+        if current_issue:
+            issues.append(current_issue)
+        
+        return issues
+    
+    def _generate_summary(self, results: Dict) -> Dict:
+        """Generate executive summary"""
+        total_issues = sum(len(v.get('issues', [])) for v in results.values() if isinstance(v, dict))
+        
+        critical_security = len(results.get('security', {}).get('critical_issues', []))
+        high_security = len(results.get('security', {}).get('high_severity', []))
+        
+        return {
+            "total_issues_found": total_issues,
+            "critical_security_issues": critical_security,
+            "high_security_issues": high_security,
+            "performance_bottlenecks": len(results.get('performance', {}).get('issues', [])),
+            "documentation_gaps": len(results.get('documentation', {}).get('issues', [])),
+            "overall_health_score": self._calculate_health_score(results),
+            "recommendation": self._get_overall_recommendation(results)
+        }
+    
+    def _prioritize_issues(self, results: Dict) -> List[Dict]:
+        """Prioritize top issues to fix"""
+        priority_list = []
+        
+        # Critical security issues (highest priority)
+        if 'security' in results:
+            for issue in results['security'].get('critical_issues', [])[:5]:
+                priority_list.append({
+                    "priority": "CRITICAL",
+                    "category": "Security",
+                    "issue": issue,
+                    "action": "Fix immediately"
+                })
+        
+        # High performance issues
+        if 'performance' in results:
+            for issue in results['performance'].get('issues', [])[:3]:
+                if issue.get('impact') in ['SEVERE', 'HIGH']:
+                    priority_list.append({
+                        "priority": "HIGH",
+                        "category": "Performance",
+                        "issue": issue,
+                        "action": "Optimize"
+                    })
+        
+        # Architecture problems
+        if 'architecture' in results:
+            for issue in results['architecture'].get('issues', [])[:2]:
+                priority_list.append({
+                    "priority": "MEDIUM",
+                    "category": "Architecture",
+                    "issue": issue,
+                    "action": "Refactor"
+                })
+        
+        return priority_list[:10]  # Top 10 priorities
+    
+    def _calculate_health_score(self, results: Dict) -> int:
+        """Calculate overall code health score (0-100)"""
+        score = 100
+        
+        # Deduct for security issues
+        score -= results.get('security', {}).get('total_issues', 0) * 5
+        
+        # Deduct for performance issues
+        score -= len(results.get('performance', {}).get('issues', [])) * 2
+        
+        # Deduct for architecture issues
+        score -= len(results.get('architecture', {}).get('issues', [])) * 3
+        
+        return max(0, min(100, score))
+    
+    def _get_overall_recommendation(self, results: Dict) -> str:
+        """Generate overall recommendation"""
+        critical = results.get('summary', {}).get('critical_security_issues', 0)
+        
+        if critical > 0:
+            return f"⚠️ URGENT: {critical} critical security issues found. Address immediately before deployment."
+        
+        score = results.get('summary', {}).get('overall_health_score', 50)
+        
+        if score >= 80:
+            return "✅ Code quality is good. Focus on minor improvements and documentation."
+        elif score >= 60:
+            return "⚠️ Code needs improvements in security and performance. Plan refactoring sprint."
+        else:
+            return "🚨 Code requires significant refactoring. Address critical issues before adding features."

@@ -13,7 +13,7 @@ import plotly.graph_objects as go
 from utils.github_helper import GitHubHelper
 from agents.deep_analyzer import DeepCodeAnalyzer
 from agents.doc_generator import DocGenerator
-from utils.history_manager import HistoryManager
+# from utils.history_manager import HistoryManager
 
 load_dotenv()
 
@@ -24,8 +24,8 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-if 'history_manager' not in st.session_state:
-    st.session_state.history_manager = HistoryManager()
+# if 'history_manager' not in st.session_state:
+#     st.session_state.history_manager = HistoryManager()
 if 'analysis_complete' not in st.session_state:
     st.session_state.analysis_complete = False
 if 'analysis_results' not in st.session_state:
@@ -105,23 +105,23 @@ with st.sidebar:
     )
     st.markdown("---")
     st.markdown("### 📜 Analysis History")
-    history = st.session_state.history_manager.get_history()
-    if history:
-        for idx, entry in enumerate(history):
-            cols = st.columns([5, 1])
-            with cols[0]:
-                if st.button(f"📊 {entry['repo_name']}", key=f"hist_{idx}", use_container_width=True):
-                    st.info(f"Score: {entry.get('health_score', 0)}/100 | Issues: {entry.get('total_issues', 0)}")
-                st.caption(f"⏰ {entry.get('timestamp', 'Unknown')}")
-            with cols[1]:
-                if st.button("🗑", key=f"del_{idx}", help="Delete"):
-                    st.session_state.history_manager.delete_entry(entry.get('id', idx))
-                    st.rerun()
-        if st.button("🗑 Clear All History", use_container_width=True):
-            st.session_state.history_manager.clear_history()
-            st.rerun()
-    else:
-        st.info("No analysis history yet")
+    # history = st.session_state.history_manager.get_history()
+    # if history:
+    #     for idx, entry in enumerate(history):
+    #         cols = st.columns([5, 1])
+    #         with cols[0]:
+    #             if st.button(f"📊 {entry['repo_name']}", key=f"hist_{idx}", use_container_width=True):
+    #                 st.info(f"Score: {entry.get('health_score', 0)}/100 | Issues: {entry.get('total_issues', 0)}")
+    #             st.caption(f"⏰ {entry.get('timestamp', 'Unknown')}")
+    #         with cols[1]:
+    #             if st.button("🗑", key=f"del_{idx}", help="Delete"):
+    #                 st.session_state.history_manager.delete_entry(entry.get('id', idx))
+    #                 st.rerun()
+    #     if st.button("🗑 Clear All History", use_container_width=True):
+    #         st.session_state.history_manager.clear_history()
+    #         st.rerun()
+    # else:
+    #     st.info("No analysis history yet")
 
 def create_dimension_chart(scores):
     dimensions = ['Security', 'Performance', 'Architecture', 'Code Quality',

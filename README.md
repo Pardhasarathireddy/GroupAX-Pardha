@@ -58,7 +58,7 @@
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/ai-devops-agent.git
+   git clone https://github.com/Pardhasarathireddy/ai-devops-agent.git
    cd ai-devops-agent
    ```
 

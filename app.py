@@ -11,8 +11,8 @@ from datetime import datetime
 import plotly.graph_objects as go
 
 from utils.github_helper import GitHubHelper
-from agents.deep_analyzer import DeepCodeAnalyzer
-from agents.doc_generator import DocGenerator
+from .agents.deep_analyzer import DeepCodeAnalyzer
+from .agents.doc_generator import DocGenerator
 from utils.history_manager import HistoryManager
 
 load_dotenv()
